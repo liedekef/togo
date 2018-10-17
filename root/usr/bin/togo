@@ -139,14 +139,29 @@ class Application:
         p_file_include = sp_file.add_parser('include',
                                       help="Include directories in project ownership.")
         p_file_include.add_argument('file_include_files', metavar="files", nargs='*', 
-                              help="Specify directories to include")
+                              help="Specify files/directories to include")
         
         # Create the file exclude parser
         p_file_exclude = sp_file.add_parser('exclude',
                                          help="Exclude directories from project ownership.")
         p_file_exclude.add_argument('file_exclude_files', metavar="files", nargs='*', 
-                              help="Specify directories to exclude")
+                              help="Specify files/directories to exclude")
         
+        # Create the file attr parser
+        p_file_attr = sp_file.add_parser('attr', help="Change file attributes")
+        p_file_attr.add_argument('--init', action="store_true", dest="file_attr_init",
+                              help="(Re)initialize file attributes database table (needed if you're upgrading from version 2.5.1)")
+        p_file_attr.add_argument('-d', action="store_true", dest="file_delete_attr",
+                              help="Delete custom attributes for a file")
+        p_file_attr.add_argument('-u', metavar='user', dest="file_user",
+                              help="Specify a user")
+        p_file_attr.add_argument('-g', metavar='group', dest="file_group",
+                              help="Specify a group")
+        p_file_attr.add_argument('-m', metavar='mode', dest="file_mode",
+                              help="Specify a mode")
+        p_file_attr.add_argument('file_attr_files', metavar="files", nargs='*', 
+                              help="Specify files to change attributes on")
+
         # Create the file flag parser and subparser
         p_file_flag = sp_file.add_parser('flag', help="Flag files")
         sp_file_flag = p_file_flag.add_subparsers(dest="sp_file_flag")
@@ -325,6 +340,36 @@ class Application:
                 else:
                     p_file_unflag.print_help()
             
+            # If we're changing file attributes
+            elif (args.sp_file == 'attr'):
+                if (args.file_attr_init):
+                    Attr.dropTable(ifExists=True)
+                    Attr.createTable()
+                else:
+                    self.verifyDirectiveData()
+                    self.updateFileDatabase()
+                    if (args.file_attr_files):
+                        if (args.file_delete_attr):
+                           for f in args.file_attr_files:
+                               self.deleteFileAttrs(f)
+                        else:
+                           if (args.file_user):
+                              user = args.file_user
+                           else:
+                              user = ''
+                           if (args.file_group):
+                              grp = args.file_group
+                           else:
+                              grp = ''
+                           if (args.file_mode):
+                              mode = args.file_mode
+                           else:
+                              mode = ''
+                           for f in args.file_attr_files:
+                               self.changeFileAttrs(f, user, grp, mode)
+                    else:
+                        p_file_attr.print_help()
+
             # If we're messing with the file database
             elif (args.sp_file == 'database'):
                 if (args.file_database_initialize):
@@ -410,6 +455,7 @@ class Application:
             
     def connectToDatabase(self):
         """ Connects to the package database """
+        """ connection_string = 'sqlite://%s?debug=true' % (self.path_database) """
         connection_string = 'sqlite://%s' % (self.path_database)
         self.connection = connectionForURI(connection_string)
         sqlhub.processConnection = self.connection
@@ -632,6 +678,14 @@ class Application:
         p = Package.get(1)
         p.unflagItem(item)
 
+    def deleteFileAttrs(self, item):
+        p = Package.get(1)
+        p.deleteFileAttrs(item)
+
+    def changeFileAttrs(self, item, user, grp, mode):
+        p = Package.get(1)
+        p.changeFileAttrs(item, user, grp, mode)
+
     def clearAllFlags(self):
         p = Package.get(1)
         p.clearAllFlags()
@@ -793,7 +847,16 @@ class Package(SQLObject):
                                             orderBy=PackageFile.q.path)):
             local_path = '%s%s'% (self.package_path_root, file.path)
             permissions = oct(os.stat(local_path).st_mode & 0777)
-            write_string = "%%attr(%s, root, root) " % (permissions)
+            user = 'root'
+            grp = 'root'
+            if (hasattr(file,"attrs")):
+                if (hasattr(file.attrs,"mode") and len(file.attrs.mode)):
+                   permissions = file.attrs.mode
+                if (hasattr(file.attrs,"user") and len(file.attrs.user)):
+                   user = file.attrs.user
+                if (hasattr(file.attrs,"grp") and len(file.attrs.grp)):
+                   grp = file.attrs.grp
+            write_string = "%%attr(%s, %s, %s) " % (permissions, user, grp)
             if (len(file.directives)):
                 for directive in file.directives:
                     write_string += '%s "%s' % (directive.name, file.path)
@@ -1003,12 +1066,6 @@ class Package(SQLObject):
 
         item = self.getPackageFile(item)
 
-        # Check to make sure the item is a directory
-        relative_path = "%s%s" % (self.package_path_root, item.path)
-        if not (os.path.isdir(relative_path)):
-            log.error("ERROR: You may only exclude directories.")
-            sys.exit(2)
-
         item.excluded = False
         item.sync()
         log.info("  Added '%s' to project ownership." % (item.path))
@@ -1017,22 +1074,23 @@ class Package(SQLObject):
         """ Excludes a file/dir from the final RPM """
         item = self.getPackageFile(item)
         
-        # Check to make sure the item is a directory
-        relative_path = "%s%s" % (self.package_path_root, item.path)
-        if not (os.path.isdir(relative_path)):
-            log.error("ERROR: You may only exclude directories.")
-            sys.exit(2)
-        
-        # Cascade the exclude down the directory tree
-        while (True):
-            item.excluded = True
-            item.sync()
-            log.info("  Removed '%s' from project ownership." % (item.path))
-            basename = os.path.dirname(item.path)
-            try:
-                item = list(PackageFile.selectBy(path=basename))[0]
-            except IndexError:
-                break
+        item.excluded = True
+        item.sync()
+        log.info("  Removed '%s' from project ownership." % (item.path))
+
+    def deleteFileAttrs(self, item):
+        item = self.getPackageFile(item)
+	if (hasattr(item.attrs,'id')):
+	   item.attrs.delete(item.attrs.id)
+
+    def changeFileAttrs(self, item, user, grp, mode):
+        """ Set file permissions, user, group """
+        self.deleteFileAttrs(item)
+        item = self.getPackageFile(item)
+        attrs = Attr(user=user, grp=grp, mode=mode, PackageFileID=item.id)
+        attrs.sync()
+        log.info("  Set permissions to '%s' and ownership to '%s:%s' for %s." % (mode, user, grp, item.path))
+
     def unflagItem(self, item):
         item = self.getPackageFile(item)
         log.info("  Unflagging '%s'" % (item.path))
@@ -1071,13 +1129,28 @@ class Package(SQLObject):
     def listFiles(self):
         files = list(PackageFile.select(PackageFile.q.excluded==0, orderBy="path"))
         if (files):
-            for f in files:
+            for file in files:
+                local_path = '%s%s'% (self.package_path_root, file.path)
+                permissions = oct(os.stat(local_path).st_mode & 0777)
+                user = 'root'
+                grp = 'root'
+                custom_set = 'Default: '
+                if (hasattr(file,"attrs")):
+                    if (hasattr(file.attrs,"mode") and len(file.attrs.mode)):
+                       permissions = file.attrs.mode
+                       custom_set = 'CUSTOM: '
+                    if (hasattr(file.attrs,"user") and len(file.attrs.user)):
+                       user = file.attrs.user
+                       custom_set = 'CUSTOM: '
+                    if (hasattr(file.attrs,"grp") and len(file.attrs.grp)):
+                       grp = file.attrs.grp
+                       custom_set = 'CUSTOM: '
                 try:
-                    directive = f.directives[0]
+                    directive = file.directives[0]
                 except IndexError:
-                    log.info("\t%s" % (f.path))
+                    log.info("\t%s (%s%s,%s,%s)" % (file.path, custom_set, permissions, user, grp))
                 else:
-                    log.info("%s\t%s" % (directive.name, f.path))
+                    log.info("%s\t%s (%s%s,%s,%s)" % (directive.name, file.path, custom_set, permissions, user, grp))
         else:
             log.info("  No files are currently in this project.")
 
@@ -1088,7 +1161,7 @@ class PackageFile(SQLObject):
     path = StringCol(unique=True)
     excluded = BoolCol(default=False)
     directives = RelatedJoin('Directive')
-    attrs = RelatedJoin('Attr')
+    attrs = SingleJoin('Attr')
 
 class Directive(SQLObject):
     class sqlmeta:
@@ -1105,7 +1178,7 @@ class Attr(SQLObject):
     mode = StringCol()
     user = StringCol()
     grp = StringCol()
-    package_files = RelatedJoin('PackageFile')
+    PackageFile = ForeignKey('PackageFile',cascade=True)
 
 # Included for legacy cleanup purposes
 class FileFlag(SQLObject):
@@ -1163,25 +1236,3 @@ class Dir:
         return self.full_path
 
 togo = Application()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
