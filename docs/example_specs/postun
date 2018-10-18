@@ -1,0 +1,12 @@
+%postun
+case "$1" in
+  0)
+    # This is an un-installation.
+    :
+  ;;
+  1)
+    # This is an upgrade.
+    # Do nothing.
+    :
+  ;;
+esac

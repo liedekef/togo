@@ -1,0 +1,91 @@
+RPM SPEC pre/post/preun/postun argument values
+
+
+RPM has 4 parts where (shell) scripts can be used:
+%pre - Executed before installation.
+%preun - Executed before un-installation.
+%post - Executed after installation.
+%postun - Executed after un-installation.
+
+In all these parts or sections the variable "$1" can be checked to see what's being done:
+Initial installation
+Upgrade
+Un-installation
+
+This table show the values of "$1" per section related to the action.
+
+			%pre 		%preun 		%post 		%postun 
+Initial installation 	1 		not applicable 	1	 	not applicable 
+Upgrade 		2 		1 		2 		1 
+Un-installation 	not applicable 	0 		not applicable 	0 
+
+This can be used for example when registering new services:
+
+%post
+case "$1" in
+  1)
+    # This is an initial install.
+    chkconfig --add newservice
+  ;;
+  2)
+    # This is an upgrade.
+    # First delete the registered service.
+    chkconfig --del newservice
+    # Then add the registered service. In case run levels changed in the init script, the service will be correctly re-added.
+    chkconfig --add newservice
+  ;;
+esac
+
+%preun
+case "$1" in
+  0)
+    # This is an un-installation.
+    service newservice stop
+    chkconfig --del newservice
+  ;;
+  1)
+    # This is an upgrade.
+    # Do nothing.
+    :
+  ;;
+esac
+
+
+Good to know; this is the order for certain RPM actions:
+
+install		upgrade						un-install 
+%pre ($1=1)	%pre ($1=2)					%preun ($1=0) 
+copy files 	copy files 					remove files 
+%post ($1=1) 	%post ($1=2) 					%postun ($1=0) 
+		%preun ($1=1) from old RPM.  
+		delete files only found in old package  
+		%postun ($1=1) from old RPM.  
+
+So when upgrading the exemplary package "software" from version 1 to version 2, this is the script (%post and %postun) order:
+1.Run %pre from "software-2".
+2.Place files from "software-2".
+3.Run %post from "software-2".
+4.Run %preun from "software-1".
+5.Delete files unique to "software-1".
+6.Run %postun from "software-1".
+
+This means there are cases where "software-1" has incorrect scripts, and there is no way to upgrade. In that case the RPM can be uninstalled, which might execute different commands because $1 equals 0 (un-install) instead of 1 (upgrade).
+When the RPM uninstall scripts fail, the only way to fix things is to manually execute the intended commands... RPM is not perfect, but it's pretty well thought through!
+
+
+CONFIG and CONFIG-NOREPLACE
+The following table shows what we ended up with after installing an RPM, optionally editing the resulting files, and then upgrading the RPM.
+
+File marked as		Changed in update RPM?	On-disk file untouched	On-disk file edited
+[default]		No			File from update	File from update
+			Yes			File from update	File from update
+%config			No			File from update	Edited file
+			Yes			File from update	File from update, edited file in .rpmsave
+%config(noreplace)	No			File from update	Edited file
+			Yes			File from update	Edited file, file from the update in .rpmnew
+For the two cases where (noreplace) has an effect, there is also the question of what happens if the status of the file as defined in the spec file changes. And the answer is:
+
+File marked as					Changed in update RPM?	On-disk file edited
+Was %config(noreplace), becomes %config		Yes			File from update, edited file in .rpmsave
+Was %config, becomes %config(noreplace)		Yes			Edited file, file from the update in .rpmnew
+In summary: if a file is not marked as a config file, or if a file has not been altered since installation, then it will be sliently replaced by the version from an update RPM. If a config file has been edited on disk, but is not actually different from one RPM to another then the edited version will be silently left in place. It is only when a config file has been edited and is different from one RPM to the next that what happens depens on the (noreplace) option. If absent, the new file will be installed, and the the old edited version will be renamed with a .rpmsave suffix. If present, the edited version will be left in place, and the new version will be installed with a .rpmnew suffix. I don't know what happens if RPM needs to create an .rpmsave or .rpmnew file and one already exists - at least in some cases it seems that the new file isn't written under these circumstances.

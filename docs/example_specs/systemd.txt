@@ -1,0 +1,29 @@
+Packages with systemd unit files must put them into %{_unitdir}. %{_unitdir} evaluates to /lib/systemd/system on all Fedora systems (F-15+). Unit files are architecture independent (hence, not %{_lib}) and needed early in the boot process. 
+
+Please note that in order for the %{_unitdir} macro to exist, your package must have: 
+BuildRequires: systemd
+
+Systemd unit .service files must not be marked as %config files. 
+
+
+Example spec file extract:
+==========================
+
+%{?systemd_requires}
+BuildRequires: systemd
+
+[...]
+%post
+%systemd_post apache-httpd.service
+
+%preun
+%systemd_preun apache-httpd.service
+
+%postun
+%systemd_postun_with_restart apache-httpd.service
+
+
+Some services do not support being restarted (e.g. D-Bus and various storage daemons). If your service should not be restarted upon upgrade, then use the following %postun scriptlet instead of the one shown above: 
+%postun
+%systemd_postun apache-httpd.service
+
