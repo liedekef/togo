@@ -100,6 +100,9 @@ class Application:
         p_project_rename.add_argument(metavar="name",
                                       dest="project_name",
                                       help="Desired project name")
+        p_project_rename.add_argument('--rename_dir', dest='project_rename_dir',
+                                     action="store_true",
+                                     help="When renaming the project, also rename the working project directory")
         
         # Create the build parser and subparser
         p_build = sp.add_parser('build', help="Package build commands")
@@ -237,7 +240,7 @@ class Application:
                 if (args.project_name):
                     # Set up the connection to the package database
                     self.setupDatabase()                    
-                    self.renameProject(args.project_name)
+                    self.renameProject(args.project_name,args.project_rename_dir)
         
         # If invoking build commands
         elif (args.sp == 'build'):
@@ -533,7 +536,7 @@ class Application:
             sys.exit(1)
         log.info('  New project created at: %s' % (path))
     
-    def renameProject(self, name):
+    def renameProject(self, name, rename_dir):
         """ Renames an existing package """
         
         log.info("")
@@ -543,7 +546,7 @@ class Application:
         project_path_new = "../%s" % (project_name_new)
         
         log.info("  Checking to see if destination name is ok...")
-        if (os.path.exists(project_path_new)):
+        if (rename_dir and os.path.exists(project_path_new)):
             log.error("")
             log.error("    ERROR: There is already something at the path '%s'" % (project_path_new))
             log.error("")
@@ -573,13 +576,17 @@ class Application:
                 log.info("  Updating project name in '%s/header' file..." % p.package_path_spec)
                 self.replaceInSpecHeader("Name", project_name_new)
                
-                # Update the project directory name
-                log.info("  Renaming the current working directory...")
-                os.rename(project_path_old, project_path_new)
+		if (rename_dir):
+                    # Update the project directory name
+                    log.info("  Renaming the current working directory...")
+                    os.rename(project_path_old, project_path_new)
+
                 log.info("    Done!")
-                
                 log.info("")
-                log.info("  Rename complete; type 'cd .' to refresh your current working directory.")
+		if (rename_dir):
+                    log.info("  Rename complete; type 'cd .' to refresh your current working directory.")
+		else:
+                    log.info("  Rename complete.")
                 log.info("")
     
     def replaceInSpecHeader(self, variable, value):
