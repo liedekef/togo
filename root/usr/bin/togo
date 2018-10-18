@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import compileall
+# import compileall
 import exceptions
 import fileinput
 import logging
@@ -749,7 +749,7 @@ class Package(SQLObject):
             {'' : ''},
 
             {'#': 'The release number of your package'},
-            {'Release' : '1'},
+            {'Release' : "0.%(perl -e 'print time()')"},
             {'' : ''},
 
             {'#': 'Any license you wish to list'},
@@ -794,6 +794,10 @@ class Package(SQLObject):
 
             {'#': 'You probably do not need to change this'},
             {'%' : r'define debug_package %{nil}'},
+            {'' : ''},
+
+            {'#': 'Disable python compile'},
+            {'%' : r"global __os_install_post %(echo '%{__os_install_post}' | sed -e 's!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g')"}, 
             {'' : ''},
 
         ]
@@ -886,8 +890,8 @@ class Package(SQLObject):
         log.debug("Scanning for file structure changes...")
         
         # Account for python scripts which need to be bytecompiled before inclusion
-        compileall.compile_dir('root/', quiet=True) # Generate *.pyc
-        os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
+        # compileall.compile_dir('root/', quiet=True) # Generate *.pyc
+        # os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
         
         process = subprocess.Popen('find %s' % (self.package_path_root), shell=True,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
