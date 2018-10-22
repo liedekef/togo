@@ -796,10 +796,6 @@ class Package(SQLObject):
             {'%' : r'define debug_package %{nil}'},
             {'' : ''},
 
-            {'#': 'Disable python compile'},
-            {'%' : r"global __os_install_post %(echo '%{__os_install_post}' | sed -e 's!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g')"}, 
-            {'' : ''},
-
         ]
 
         self.default_spec_sections = [
