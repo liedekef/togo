@@ -795,8 +795,15 @@ class Package(SQLObject):
             {'#': 'You probably do not need to change this'},
             {'%' : r'define debug_package %{nil}'},
             {'' : ''},
-
-        ]
+		
+	    {'#': 'Disable python byte compilation for Fedora >=30'},
+            {'%' : r'global _python_bytecompile_extra 0'},
+            {'#': 'Disable python byte compilation for Fedora <=29'},
+            {'%' : r'undefine __brp_python_bytecompile'},
+            {'#': 'Disable python byte compilation for older releases'},
+            {'%' : r'global __os_install_post %(echo \'%{__os_install_post}\' | sed -e \'s!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g\')'},
+            {'' : ''},
+	]
 
         self.default_spec_sections = [
             {'prep' : r'%prep' + '\n' + r'%setup -q -c'},
@@ -886,8 +893,8 @@ class Package(SQLObject):
         log.debug("Scanning for file structure changes...")
         
         # Account for python scripts which need to be bytecompiled before inclusion
-        compileall.compile_dir('root/', quiet=True) # Generate *.pyc
-        os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
+        # compileall.compile_dir('root/', quiet=True) # Generate *.pyc
+        # os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
         
         process = subprocess.Popen('find %s' % (self.package_path_root), shell=True,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
