@@ -1,14 +1,14 @@
 %changelog
 
 * Tue Sep 17 2019 Franky Van Liedekerke <liedekef@telenet.be>
-- Byte compilation deactivated. Existing projects should remove these and add the following to their project header file:
+- Byte compilation deactivated. Existing projects should remove existing .pyc and .pyo files in their project dir and add the following to their project header file:
 # Disable python byte compilation for Fedora >=30
 %global _python_bytecompile_extra 0
 # Disable python byte compilation for Fedora <=29
 %undefine __brp_python_bytecompile
 # Disable python byte compilation for older releases
 %global __os_install_post %(echo \'%{__os_install_post}\' | sed -e \'s!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g\')
-If your version of OS still creates these, don't forget to remove them on postuninstall (and optionally on upgrade)
+If your version of OS still creates these, don't forget to remove them via postuninstall (and optionally on upgrade)
 
 * Sun Mar 18 2018 Gene Reese <gene.reese@xirsix.com>
 - Added support for %config(noreplace) file flag
