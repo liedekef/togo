@@ -1,4 +1,8 @@
 %changelog
+
+* Tue Sep 17 2019 Franky Van Liedekerke <liedekef@telenet.be>
+- Byte compilation deactivated, see the README file for info
+
 * Sun Mar 18 2018 Gene Reese <gene.reese@xirsix.com>
 - Added support for %config(noreplace) file flag
 
