@@ -81,11 +81,19 @@ $ togo file exclude root/usr/local/bin
 ...
 ```
 
-4) **OPTIONAL:** Modify the generated spec file to your desired version/release/summary, etc.
+4) **OPTIONAL:** Change attributes on files included in the RPM (by default the user/group is root/root and the mode is taken from the existing file):
+```bash
+$ togo file attr -u myuser root/usr/local/bin/test
+$ togo file attr -g mygroup root/usr/local/bin/test
+$ togo file attr -m 750 root/usr/local/bin/test
+...
+```
+
+5) **OPTIONAL:** Modify the generated spec file to your desired version/release/summary, etc.
 ```bash
 $ vi spec/header
 ```
-5) Build the RPM
+6) Build the RPM
 ```bash
 $ togo build package
 ```
