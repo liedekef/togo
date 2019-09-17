@@ -109,3 +109,4 @@ In RHEL8 and newer versions of Fedora it has been decided that python byte compi
 # Disable python byte compilation for older releases
 %global __os_install_post %(echo \'%{__os_install_post}\' | sed -e \'s!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g\')
 ```
+If your version of OS still creates these, don't forget to remove them on postuninstall (and optionally on upgrade)
