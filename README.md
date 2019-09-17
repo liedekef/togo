@@ -90,3 +90,14 @@ $ vi spec/header
 $ togo build package
 ```
 -and your RPM is placed into the ./rpms directory.
+
+### Python byte compilation
+In RHEL8 and newer versions of Fedora it has been decided that python byte compilation should be explicitly added in specific cases only, so from now on the code no longer creates the .pyc and .pyo files. Existing projects should remove these and add the following to their project header file:
+```
+# Disable python byte compilation for Fedora >=30
+%global _python_bytecompile_extra 0
+# Disable python byte compilation for Fedora <=29
+%undefine __brp_python_bytecompile
+# Disable python byte compilation for older releases
+%global __os_install_post %(echo \'%{__os_install_post}\' | sed -e \'s!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g\')
+```
