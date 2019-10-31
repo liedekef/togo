@@ -1,7 +1,28 @@
-#!/usr/bin/python
+#!/bin/sh
+
+# Shell commands follow
+# Next line is bilingual: it starts a comment in Python, and is a no-op in shell
+""":"
+
+# Find a suitable python interpreter (adapt for your specific needs)
+for cmd in python3 python2 ; do
+   command -v > /dev/null $cmd && exec $cmd $0 "$@"
+done
+
+echo "OMG Python not found, exiting!!!!!11!!eleven" >2
+
+exit 2
+
+":"""
+# Previous line is bilingual: it ends a comment in Python, and is a no-op in shell
+# Shell commands end here
+# Python script follows (example commands shown)
 
 import compileall
-import exceptions
+try:
+    import exceptions
+except ImportError:
+    import builtins as exceptions
 import fileinput
 import logging
 import optparse
@@ -35,6 +56,9 @@ APPLICATION_DATABASE_NAME = 'helper.db'
 PREFERENCE_NAME = ''
 PREFERENCE_EMAIL = ''
 
+def printf(format, *args):
+    sys.stdout.write(format % args)
+
 class Application:
     """
     Main application class.
@@ -54,9 +78,8 @@ class Application:
         # Override default argparse behavior
         class TogoParser(argparse.ArgumentParser):
             def error(self, message):
-                print 'error: %s\n' % (message)
+                printf('error: %s\n',message)
                 self.print_help()
-                print
                 sys.exit(2)
         
         # Create the main parser
@@ -81,6 +104,7 @@ class Application:
         p_configure.add_argument('-e',
                                   metavar='email', dest='preference_email',
                                   help="Set builder email address")
+
         p_configure.add_argument('--pref_init', action="store_true",
                                   dest='preference_reinitialize',
                                   help="(Re)initialize the preferences database.")
@@ -576,16 +600,16 @@ class Application:
                 log.info("  Updating project name in '%s/header' file..." % p.package_path_spec)
                 self.replaceInSpecHeader("Name", project_name_new)
                
-		if (rename_dir):
+                if (rename_dir):
                     # Update the project directory name
                     log.info("  Renaming the current working directory...")
                     os.rename(project_path_old, project_path_new)
 
                 log.info("    Done!")
                 log.info("")
-		if (rename_dir):
+                if (rename_dir):
                     log.info("  Rename complete; type 'cd .' to refresh your current working directory.")
-		else:
+                else:
                     log.info("  Rename complete.")
                 log.info("")
     
@@ -795,15 +819,14 @@ class Package(SQLObject):
             {'#': 'You probably do not need to change this'},
             {'%' : r'define debug_package %{nil}'},
             {'' : ''},
-		
-	    {'#': 'Disable python byte compilation for Fedora >=30'},
+
+            {'#': 'Disable python byte compilation for Fedora >=30'},
             {'%' : r'global _python_bytecompile_extra 0'},
             {'#': 'Disable python byte compilation for Fedora <=29'},
             {'%' : r'undefine __brp_python_bytecompile'},
             {'#': 'Disable python byte compilation for older releases'},
             {'%' : r'global __os_install_post %(echo \'%{__os_install_post}\' | sed -e \'s!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g\')'},
-            {'' : ''},
-	]
+        ]
 
         self.default_spec_sections = [
             {'prep' : r'%prep' + '\n' + r'%setup -q -c'},
@@ -860,7 +883,7 @@ class Package(SQLObject):
         for file in list(PackageFile.select(PackageFile.q.excluded==0,
                                             orderBy=PackageFile.q.path)):
             local_path = '%s%s'% (self.package_path_root, file.path)
-            permissions = oct(os.stat(local_path).st_mode & 0777)
+            permissions = oct(os.stat(local_path).st_mode & 0o777)
             user = 'root'
             grp = 'root'
             if (hasattr(file,"attrs")):
@@ -893,8 +916,8 @@ class Package(SQLObject):
         log.debug("Scanning for file structure changes...")
         
         # Account for python scripts which need to be bytecompiled before inclusion
-        # compileall.compile_dir('root/', quiet=True) # Generate *.pyc
-        # os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
+        #compileall.compile_dir('root/', quiet=True) # Generate *.pyc
+        #os.system("python -O -m compileall root/ > /dev/null 2>&1")  # Generate *.pyo
         
         process = subprocess.Popen('find %s' % (self.package_path_root), shell=True,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -1070,7 +1093,7 @@ class Package(SQLObject):
         try:
             item = list(PackageFile.selectBy(path=converted_item))[0]
         except:
-            print "Couldn't find '%s' in the file/dir database." % (converted_item)
+            printf("Couldn't find '%s' in the file/dir database.",converted_item)
             sys.exit(1)
         else:
             return item
@@ -1094,8 +1117,8 @@ class Package(SQLObject):
 
     def deleteFileAttrs(self, item):
         item = self.getPackageFile(item)
-	if (hasattr(item.attrs,'id')):
-	   item.attrs.delete(item.attrs.id)
+        if (hasattr(item.attrs,'id')):
+           item.attrs.delete(item.attrs.id)
 
     def changeFileAttrs(self, item, user, grp, mode):
         """ Set file permissions, user, group """
@@ -1145,7 +1168,7 @@ class Package(SQLObject):
         if (files):
             for file in files:
                 local_path = '%s%s'% (self.package_path_root, file.path)
-                permissions = oct(os.stat(local_path).st_mode & 0777)
+                permissions = oct(os.stat(local_path).st_mode & 0o777)
                 user = 'root'
                 grp = 'root'
                 custom_set = 'Default: '
